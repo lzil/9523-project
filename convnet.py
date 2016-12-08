@@ -16,7 +16,7 @@ NUM_LABELS = 10
 NUM_CHANNELS = 1
 
 BATCH_SIZE = 100
-NUM_EPOCHS = 100
+NUM_EPOCHS = 10
 EVAL_FREQUENCY = 10
 
 timestamp = time.strftime("%Y-%m-%d_%H:%M:%S")
@@ -46,7 +46,9 @@ def model(data, dropout=None, maxout_k=1, activation_fn=tf.nn.relu):
     return output
 
 def run(args):
-    tensorboard_prefix = TB_LOGS_DIR + timestamp
+    if args.name:
+        args.name += '__'
+    tensorboard_prefix = TB_LOGS_DIR + args.name + timestamp + '/'
     if not os.path.exists(MNIST_DIR):
         os.makedirs(MNIST_DIR)
     mnist = input_data.read_data_sets(MNIST_DIR, one_hot=True)
@@ -72,8 +74,9 @@ def run(args):
 
     loss_summary = tf.scalar_summary('Loss', loss)
     accuracy_summary = tf.scalar_summary('Accuracy', accuracy)
+    error_summary = tf.scalar_summary('Error', 1 - accuracy)
     merged = tf.merge_all_summaries()
-    metric_summaries = tf.merge_summary([loss_summary, accuracy_summary]) # skip weights
+    metric_summaries = tf.merge_summary([loss_summary, accuracy_summary, error_summary]) # skip weights
 
     start_time = time.time()
     with tf.Session() as sess:
@@ -126,7 +129,7 @@ def run(args):
                 print('\tMinibatch loss: %.3f' % train_l)
                 print('\tMinibatch accuracy: %.1f%%' % (100*train_accuracy))
                 print('\tValidation loss: %.3f' % val_l)
-                print('\tValidation top-1 accuracy: %.1f%%' % (100*val_accuracy))
+                print('\tValidation accuracy: %.1f%%' % (100*val_accuracy))
                 sys.stdout.flush()
 
 
@@ -134,5 +137,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--dropout', default=False, action='store_true', help='Use Dropout.')
     parser.add_argument('-m', '--maxout', type=int, default=None, help='Use Maxout. Pass in number of activation inputs.')
+    parser.add_argument('-o', '--name', type=str, default='', help='A name for the run.')
     args = parser.parse_args()
     run(args)
