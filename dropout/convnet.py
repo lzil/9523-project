@@ -65,8 +65,8 @@ def run(args):
         maxout_k = args.maxout
         activation_fn = maxout(args.maxout)
     dropout_train = args.dropout
-    dropout_val = args.dropout_val
-    dropout_test = args.dropout_val
+    dropout_vals = [0.1*x for x in range(1,11)]
+    dropout_tests = dropout_vals
 
     x = tf.placeholder(tf.float32, [BATCH_SIZE, SIZE*SIZE], name='input')
     y = tf.placeholder(tf.int32, [BATCH_SIZE, NUM_LABELS], name='labels')
@@ -91,9 +91,9 @@ def run(args):
         os.makedirs(tensorboard_prefix + 'training/')
         train_writer = tf.train.SummaryWriter(tensorboard_prefix + 'training/', graph=sess.graph)
         os.makedirs(tensorboard_prefix + 'validation/')
-        val_writer = tf.train.SummaryWriter(tensorboard_prefix + 'validation/')
+        val_writers = [tf.train.SummaryWriter(tensorboard_prefix + 'validation/d_%d_%d/' % (round(100*dropout_train), round(100*dropout_val))) for dropout_val in dropout_vals]
         os.makedirs(tensorboard_prefix + 'test/')
-        test_writer = tf.train.SummaryWriter(tensorboard_prefix + 'test/')
+        test_writers = [tf.train.SummaryWriter(tensorboard_prefix + 'test/d_%d_%d/' % (round(100*dropout_train), round(100*dropout_test))) for dropout_test in dropout_tests]
 
         # Run all the initializers to prepare the trainable parameters.
         sess.run(tf.initialize_all_variables())
@@ -107,20 +107,22 @@ def run(args):
             print('Added image summary.')
 
         def test(step):
-            _acc = 0.
+            _accs = [0.] * len(dropout_tests)
             for s in range(mnist.test.num_examples // BATCH_SIZE):
                 test_data, test_labels = mnist.test.next_batch(BATCH_SIZE)
 
                 # calculate testidation set metrics
-                test_l, test_predictions, test_accuracy, test_summary = sess.run(
-                        [loss, prediction, accuracy, metric_summaries],
-                        feed_dict={x: test_data, y: test_labels, keep_prob: dropout_test})
-                _acc += test_accuracy
-            _acc /= mnist.test.num_examples // BATCH_SIZE
+                for i, dropout_test in enumerate(dropout_tests):
+                    test_l, test_predictions, test_accuracy, test_summary = sess.run(
+                            [loss, prediction, accuracy, metric_summaries],
+                            feed_dict={x: test_data, y: test_labels, keep_prob: dropout_test})
+                    _accs[i] += test_accuracy
+            for _acc, test_writer in zip(_accs, test_writers):
+                _acc /= mnist.test.num_examples // BATCH_SIZE
 
-            # Add TensorBoard summary to summary writer
-            test_writer.add_summary(sess.run(tf.scalar_summary('Test Accuracy', _acc)), step)
-            test_writer.flush()
+                # Add TensorBoard summary to summary writer
+                test_writer.add_summary(sess.run(tf.scalar_summary('Test Accuracy', _acc)), step)
+                test_writer.flush()
 
         make_image(0)
 
@@ -141,19 +143,18 @@ def run(args):
 
             # print some extra information once reach the evaluation frequency
             if step % EVAL_FREQUENCY == 0:
+                train_writer.flush()
+
                 # get next validation batch
                 val_data, val_labels = mnist.validation.next_batch(BATCH_SIZE)
 
                 # calculate validation set metrics
-                val_l, val_predictions, val_accuracy, val_summary = sess.run(
-                        [loss, prediction, accuracy, metric_summaries],
-                        feed_dict={x: val_data, y: val_labels, keep_prob: dropout_val})
-                val_writer.add_summary(val_summary, step)
-
-                # Add TensorBoard summary to summary writer
-                val_writer.add_summary(val_summary, step)
-                train_writer.flush()
-                val_writer.flush()
+                for i, dropout_val in enumerate(dropout_vals):
+                    val_l, val_predictions, val_accuracy, val_summary = sess.run(
+                            [loss, prediction, accuracy, metric_summaries],
+                            feed_dict={x: val_data, y: val_labels, keep_prob: dropout_val})
+                    val_writers[i].add_summary(val_summary, step)
+                    val_writers[i].flush()
 
                 # Print info/stats
                 elapsed_time = time.time() - start_time
@@ -177,7 +178,7 @@ def run(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--dropout', type=float, default=1., help='Use Dropout on training.')
-    parser.add_argument('-f', '--dropout_val', type=float, default=1., help='Use Dropout on validation.')
+    parser.add_argument('-f', '--dropout_val', type=float, default=1., help='Use Dropout on validation. Not used.')
     parser.add_argument('-m', '--maxout', type=int, default=None, help='Use Maxout. Pass in number of activation inputs.')
     parser.add_argument('-o', '--name', type=str, default='', help='A name for the run.')
     args = parser.parse_args()
