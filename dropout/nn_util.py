@@ -1,3 +1,4 @@
+import math
 import operator
 from functools import reduce
 
@@ -16,7 +17,8 @@ def weight_variable(shape, name=None):
     :param name:
     :return:
     """
-    sigma=np.sqrt(2./np.product(shape[:-1]))
+    # sigma = np.sqrt(2./np.product(shape[:-1]))
+    sigma = 0.01
     with tf.name_scope('weight'):
         weight = tf.Variable(tf.truncated_normal(
             shape,
@@ -54,6 +56,7 @@ def conv_layer(input_layer, depth, window, stride=1, maxout_k=1, activation_fn=t
         assert(input_layer.get_shape().ndims == 4)
         depth *= maxout_k
         w = weight_variable([window, window, input_layer.get_shape().as_list()[-1], depth], name)
+        tf.add_to_collection('conv_w', w)
         b = bias_variable([depth], name)
         conv = tf.nn.conv2d(input_layer, w, strides=[1, stride, stride, 1], padding='SAME') + b
         # Note: Sample code seems to use tf.nn.bias_add instead of straight addition here.
@@ -143,3 +146,17 @@ def maxout(k):
         output = tf.reduce_max(reshape, reduction_indices=-1, name=name)
         return output
     return maxout_activation_fn
+
+
+def weight_to_image_summary(weight, name=None, max_images=1):
+    """Use for first convolutional layer."""
+    with tf.name_scope('weight_summary'):
+        v = weight
+        iy, ix, channels, depth = v.get_shape().as_list()
+        cy = math.ceil(math.sqrt(depth))
+        cx = cy
+        v = tf.pad(v, ((0,0), (0,0), (0,0), (0,cy*cx-depth)))
+        v = tf.reshape(v, (iy, ix, channels, cy, cx))
+        v = tf.transpose(v, (3,0,4,1,2)) # cy,iy,cx,ix,channels
+        v = tf.reshape(v, (1, cy*iy, cx*ix, channels))
+        return tf.image_summary(name, v, max_images=max_images)
