@@ -26,8 +26,10 @@ timestamp = time.strftime("%Y-%m-%d_%H:%M:%S")
 def model(data, dropout=None, maxout_k=1, activation_fn=tf.nn.relu):
     data = tf.reshape(data, [BATCH_SIZE, SIZE, SIZE, NUM_CHANNELS])
     conv = conv_layer(data, depth=64, window=5,
+            dropout=dropout,
             pool=(2, 2), maxout_k=maxout_k, activation_fn=activation_fn, name='conv1')
     conv = conv_layer(conv, depth=32, window=5,
+            dropout=dropout,
             pool=(2, 2), maxout_k=maxout_k, activation_fn=activation_fn, name='conv2')
     reshape = conv_to_fc_layer(conv)
     hidden = fc_layer(
@@ -106,7 +108,7 @@ def run(args):
 
         def test(step):
             _acc = 0.
-            for step in range(mnist.test.num_examples // BATCH_SIZE):
+            for s in range(mnist.test.num_examples // BATCH_SIZE):
                 test_data, test_labels = mnist.test.next_batch(BATCH_SIZE)
 
                 # calculate testidation set metrics

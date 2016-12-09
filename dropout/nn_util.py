@@ -17,8 +17,8 @@ def weight_variable(shape, name=None):
     :param name:
     :return:
     """
-    # sigma = np.sqrt(2./np.product(shape[:-1]))
-    sigma = 0.01
+    sigma = np.sqrt(2./np.product(shape[:-1])) / 10
+    # sigma = 0.01
     with tf.name_scope('weight'):
         weight = tf.Variable(tf.truncated_normal(
             shape,
@@ -36,7 +36,7 @@ def bias_variable(shape, name=None):
         return bias
 
 
-def conv_layer(input_layer, depth, window, stride=1, maxout_k=1, activation_fn=tf.nn.relu, pool=None, lrn=None, name=None,
+def conv_layer(input_layer, depth, window, stride=1, maxout_k=1, dropout=None, activation_fn=tf.nn.relu, pool=None, lrn=None, name=None,
                variables=None):
     """Construct a convolutional layer which takes input_layer as input.
 
@@ -74,6 +74,9 @@ def conv_layer(input_layer, depth, window, stride=1, maxout_k=1, activation_fn=t
             if pool is not None:
                 (pool_ksize, pool_stride) = pool
                 output = tf.nn.max_pool(output, ksize=[1, pool_ksize, pool_ksize, 1], strides=[1, pool_stride, pool_stride, 1], padding='SAME')
+            if dropout is not None:
+                keep_prob = dropout
+                hidden = tf.nn.dropout(output, keep_prob)
         if variables is not None:
             variables['conv_w'].append(w)
             variables['conv_b'].append(b)
